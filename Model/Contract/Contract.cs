@@ -1,12 +1,12 @@
-﻿namespace s28201_Project.Model.Contract;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 
-public class Contract
+namespace s28201_Project.Model;
+
+public abstract class Contract
 {
-    // TODO: Move to contract calculation price service?
-    private static readonly long UPDATES_YEAR_PRICE = 1000;
-    
-    public long ContactId { get; set; }
+    public long ContractId { get; set; }
     // = years of support + software price
+    [Column(TypeName = "decimal(36, 12)")]
     public decimal TotalPrice { get; set; }
     // 3-30 days
     public DateOnly StartDate { get; set; }
@@ -14,11 +14,9 @@ public class Contract
     // 0-1-2-3
     public int AdditionalSupportYears { get; set; }
     public bool IsSigned { get; set; }
+    [Column(TypeName = "decimal(9, 4)")]
+    public decimal DiscountPercentage { get; set; }
     
     public long SoftwareId { get; set; }
     public virtual SoftwareLicense Software { get; set; }
-    public long DiscountId { get; set; }
-    public virtual Discount Discount { get; set; }
-    public long ClientId { get; set; }
-    public virtual Client Client { get; set; }
 }
