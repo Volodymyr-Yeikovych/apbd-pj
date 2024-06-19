@@ -1,24 +1,55 @@
-﻿using s28201_Project.Model;
+﻿using Microsoft.EntityFrameworkCore;
+using s28201_Project.Context;
+using s28201_Project.Dto;
+using s28201_Project.Model;
 
 namespace s28201_Project.Service;
 
-public class IndividualClientService : IClientService
+public class IndividualClientService(ApiContext context) : IClientService<IndividualClient, IndividualClientDto>
 {
-    // TODO: Not Implemented
-    public async Task<bool> AddClientAsync(Client client)
+    public async Task<bool> AddClientAsync(IndividualClientDto dto)
     {
-        return false;
+        var byPesel = await GetClientByPeselAsync(dto.Pesel);
+        if (byPesel != null) return false;
+        
+        var client = new IndividualClient(dto);
+        
+        await context.IndividualClients.AddAsync(client);
+        await context.SaveChangesAsync();
+        
+        return true;
     }
     
-    // TODO: Not Implemented
-    public async Task<bool> UpdateClientAsync(Client client)
+    public async Task<bool> UpdateClientAsync(IndividualClientDto dto)
     {
-        return false;
+        var byPesel = await GetClientByPeselAsync(dto.Pesel);
+        if (byPesel == null) return false;
+
+        byPesel.Set(dto);
+        
+        await context.SaveChangesAsync();
+        
+        return true;
     }
 
-    // TODO: Not Implemented
-    public async Task<bool> DeleteClientAsync(Client client)
+    public async Task<bool> DeleteClientAsync(string pesel)
     {
-        return false;
+        var byPesel = await GetClientByPeselAsync(pesel);
+        if (byPesel == null) return false;
+
+        byPesel.IsDeleted = true;
+        await context.SaveChangesAsync();
+        
+        return true;
+    }
+
+    public async Task<IndividualClient?> GetClientByIdAsync(long id)
+    {
+        return await context.IndividualClients.FirstOrDefaultAsync(c => c.ClientId == id);
+    }
+
+    public async Task<IndividualClient?> GetClientByPeselAsync(string pesel)
+    {
+        return await context.IndividualClients.FirstOrDefaultAsync(c => c.Pesel == pesel);
     }
 }
