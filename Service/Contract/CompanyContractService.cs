@@ -7,16 +7,19 @@ using s28201_Project.Model;
 namespace s28201_Project.Service;
 
 public class CompanyContractService(
-    ApiContext context, 
+    ApiContext context,
     CompanyClientService clientService,
     LicenseService licenseService
-    )
+)
 {
     private const long UpdatesYearPrice = 1000;
 
-    public async Task<Contract?> GetContractByIdAsync(long id)
+    public async Task<CompanyContract?> GetContractByIdAsync(long id)
     {
-        return await context.CompanyContracts.FirstOrDefaultAsync(c => c.ContractId == id);
+        return await context.CompanyContracts
+            .Include(c => c.CompanyClient)
+            .Include(c => c.CorporateInstallments)
+            .FirstOrDefaultAsync(c => c.ContractId == id);
     }
 
     public async Task<ContractResponse> AddContractAsync(ContractDto dto)
@@ -58,10 +61,11 @@ public class CompanyContractService(
         }
 
         var discount = await clientService.GetMaximalDiscountAsync(client);
-        
-        await CreateAndSaveContractAsync(dto.StartDate, dto.EndDate, dto.AdditionalSupportYears, license, discount, client);
 
-        response.IsSuccess = true;
+        await CreateAndSaveContractAsync(dto.StartDate, dto.EndDate, dto.AdditionalSupportYears, license, discount,
+            client);
+
+        response.IsSuccessful = true;
         return response;
     }
 
@@ -76,7 +80,7 @@ public class CompanyContractService(
     {
         var contract = new CompanyContract
         {
-            TotalPrice = await CalcTotalPriceAsync(supportYears, license.StartingUpfrontPrice),
+            TotalPrice = await CalcTotalPriceAsync(supportYears, license.StartingUpfrontPrice, discount),
             StartDate = start,
             EndDate = end,
             AdditionalSupportYears = supportYears,
@@ -89,11 +93,13 @@ public class CompanyContractService(
         await context.SaveChangesAsync();
     }
 
-    private Task<decimal> CalcTotalPriceAsync(int supportYears, decimal licensePrice)
+    private Task<decimal> CalcTotalPriceAsync(int supportYears, decimal licensePrice, decimal discount)
     {
         var totalYearsSupport = 1 + supportYears;
         var result = licensePrice + totalYearsSupport * UpdatesYearPrice;
-        
+        var priceDiscountMultiplicator = 1 - discount / 100;
+        result *= priceDiscountMultiplicator;
+
         return Task.FromResult(result);
     }
 
@@ -101,7 +107,7 @@ public class CompanyContractService(
     {
         var licenses = await GetAllProductsForAsync(client);
         if (licenses.Count == 0) return false;
-        
+
         if (licenses.Any(c => c.SoftwareLicenseId == license.SoftwareLicenseId)) return true;
 
         return false;
@@ -131,5 +137,47 @@ public class CompanyContractService(
         long daysDiff = (end - start).Days;
 
         return Task.FromResult(daysDiff is < 3 or > 30);
+    }
+
+    // TODO: TO BE IMPLEMENTED
+    public async Task TryDissolveIfExpiredAsync(Contract contract)
+    {
+        throw new NotImplementedException();
+        // RETURN INSTALLMENTS IF EXIST HERE
+    }
+
+    public Task<decimal> CalcRemainingPriceToPayAsync(CompanyContract contract)
+    {
+        var installments = contract.CorporateInstallments;
+        var remainingPrice = contract.TotalPrice;
+
+        foreach (var i in installments)
+        {
+            remainingPrice -= i.Price;
+        }
+
+        return Task.FromResult(remainingPrice);
+    }
+    
+    public async Task<bool> TrySignContractAsync(CompanyContract contract)
+    {
+        var toBePaid = await CalcRemainingPriceToPayAsync(contract);
+        switch (toBePaid)
+        {
+            case > 0:
+                return false;
+            case 0:
+                return true;
+            default:
+                var toBeReturned = toBePaid * -1;
+                await ReturnExcessiveMoneyToClientAsync(contract, toBeReturned);
+                return true;
+        }
+    }
+
+    private Task ReturnExcessiveMoneyToClientAsync(CompanyContract contract, decimal toBeReturned)
+    {
+        Console.WriteLine($"Amount: [{toBeReturned}] needs to be returned to client with KRS [{contract.CompanyClient.KrsNum}]");
+        return Task.CompletedTask;
     }
 }
