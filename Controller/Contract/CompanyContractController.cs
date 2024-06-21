@@ -23,15 +23,20 @@ public class CompanyContractController(CompanyContractService service) : Control
     {
         var response = await service.AddContractAsync(dto);
 
-        if (!response.IsSuccess) return BadRequest(response.Message);
+        if (!response.IsSuccessful) return BadRequest(response.Message);
         
         return NoContent();
     }
     
     // TODO: Not Implemented
-    [HttpPut]
-    public async Task<IActionResult> SignContractAsync()
-    {
-        return NoContent();
-    }
+    // [HttpPut("{id:long}")]
+    // public async Task<IActionResult> SignContractAsync(long id)
+    // {
+    //     var isSigned = await service.SignContractAsync(id);
+    //
+    //     if (!isSigned) return BadRequest($"Contract with id[{id}] cannot be signed.");
+    //      
+    //     return NoContent();
+    // }
+    
 }
