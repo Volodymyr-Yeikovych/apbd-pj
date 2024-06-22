@@ -12,7 +12,7 @@ public class CompanyInstallmentService(ApiContext context, CompanyContractServic
 
         if (dto.DistributionType != DistributionType.Upfront)
         {
-            response.message = "Is not a contract installment.";
+            response.Message = "Is not a contract installment.";
             return response;
         }
 
@@ -20,20 +20,20 @@ public class CompanyInstallmentService(ApiContext context, CompanyContractServic
 
         if (contract == null)
         {
-            response.message = "Cannot pay for non-existent contract.";
+            response.Message = "Cannot pay for non-existent contract.";
             return response;
         }
 
         if (await IsInvalidPaymentDateAsync(dto.DatePaid, contract.StartDate, contract.EndDate))
         {
-            response.message = "Invalid payment date for given contract.";
+            response.Message = "Invalid payment date for given contract.";
             await contractService.TryDissolveIfExpiredAsync(contract);
             return response;
         }
 
         if (dto.Price < 0)
         {
-            response.message = "Installment cannot have negative price.";
+            response.Message = "Installment cannot have negative price.";
             return response;
         }
 
@@ -46,11 +46,11 @@ public class CompanyInstallmentService(ApiContext context, CompanyContractServic
         var isSigned = await contractService.TrySignContractAsync(contract);
 
         var priceDiff = await contractService.CalcRemainingPriceToPayAsync(contract);
-        response.message = $"Installment was added, but you need to pay {priceDiff} more to sign the contract.";
+        response.Message = $"Installment was added, but you need to pay {priceDiff} more to sign the contract.";
 
         if (isSigned)
         {
-            response.message = "Contract was signed successfully.";
+            response.Message = "Contract was signed successfully.";
         }
 
         response.IsSuccessful = true;
