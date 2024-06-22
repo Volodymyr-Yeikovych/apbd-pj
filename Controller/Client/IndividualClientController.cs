@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using s28201_Project.Dto;
 using s28201_Project.Service;
 
@@ -10,6 +11,7 @@ public class IndividualClientController(IndividualClientService service) : Contr
 {
     
     [HttpGet("{id:long}")]
+    [Authorize(Policy = "UserOrAdmin")]
     public async Task<IActionResult> GetClientAsync(long id)
     {
         var client = await service.GetClientByIdAsync(id);
@@ -20,6 +22,7 @@ public class IndividualClientController(IndividualClientService service) : Contr
     }
     
     [HttpPost]
+    [Authorize(Policy = "UserOrAdmin")]
     public async Task<IActionResult> AddClientAsync(IndividualClientDto dto)
     {
         var client = await service.AddClientAsync(dto);
@@ -30,6 +33,7 @@ public class IndividualClientController(IndividualClientService service) : Contr
     }
     
     [HttpPut]
+    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> UpdateClientAsync(IndividualClientDto dto)
     {
         var result = await service.UpdateClientAsync(dto);
@@ -41,6 +45,7 @@ public class IndividualClientController(IndividualClientService service) : Contr
 
     
     [HttpDelete("{pesel}")]
+    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> DeleteClientAsync(string pesel)
     {
         var result = await service.DeleteClientAsync(pesel);
