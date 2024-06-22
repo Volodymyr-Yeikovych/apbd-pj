@@ -68,51 +68,74 @@ public class CompanyContractService(
         response.IsSuccessful = true;
         return response;
     }
-
-    private async Task CreateAndSaveContractAsync(
-        DateOnly start,
-        DateOnly end,
-        int supportYears,
-        SoftwareLicense license,
-        decimal discount,
-        CompanyClient client
-    )
+    
+    public async Task TryDissolveIfExpiredAsync(CompanyContract contract)
     {
-        var contract = new CompanyContract
+        if (await IsExpiredContractAsync(contract))
         {
-            TotalPrice = await CalcTotalPriceAsync(supportYears, license.StartingUpfrontPrice, discount),
-            StartDate = start,
-            EndDate = end,
-            AdditionalSupportYears = supportYears,
-            Software = license,
-            DiscountPercentage = discount,
-            CompanyClient = client
-        };
+            var toBePaid = await CalcRemainingPriceToPayAsync(contract);
+            var toBeReturned = toBePaid * -1;
+            if (toBeReturned > 0)
+            {
+                await ReturnExcessiveMoneyToClientAsync(contract, toBeReturned);
+            }
+            await DissolveContractAsync(contract);
+        }
+    }
 
-        await context.CompanyContracts.AddAsync(contract);
+    public Task<decimal> CalcRemainingPriceToPayAsync(CompanyContract contract)
+    {
+        var installments = contract.CorporateInstallments;
+        var remainingPrice = contract.TotalPrice;
+
+        foreach (var i in installments)
+        {
+            remainingPrice -= i.Price;
+        }
+
+        return Task.FromResult(remainingPrice);
+    }
+
+    public async Task<bool> TrySignContractAsync(long id)
+    {
+        var contract = await GetContractByIdAsync(id);
+        if (contract == null) return false;
+        return await TrySignContractAsync(contract);
+    }
+
+    public async Task<bool> TrySignContractAsync(CompanyContract contract)
+    {
+        var toBePaid = await CalcRemainingPriceToPayAsync(contract);
+        switch (toBePaid)
+        {
+            case > 0:
+                return false;
+            case 0:
+                return true;
+            default:
+                var toBeReturned = toBePaid * -1;
+                await ReturnExcessiveMoneyToClientAsync(contract, toBeReturned);
+                return true;
+        }
+    }
+
+    private Task ReturnExcessiveMoneyToClientAsync(CompanyContract contract, decimal toBeReturned)
+    {
+        Console.WriteLine($"Amount: [{toBeReturned}] needs to be returned to client with KRS [{contract.CompanyClient.KrsNum}]");
+        return Task.CompletedTask;
+    }
+    
+    private async Task DissolveContractAsync(CompanyContract contract)
+    {
+        context.CompanyContracts.Remove(contract);
         await context.SaveChangesAsync();
     }
 
-    private Task<decimal> CalcTotalPriceAsync(int supportYears, decimal licensePrice, decimal discount)
+    private Task<bool> IsExpiredContractAsync(CompanyContract contract)
     {
-        var totalYearsSupport = 1 + supportYears;
-        var result = licensePrice + totalYearsSupport * UpdatesYearPrice;
-        var priceDiscountMultiplicator = 1 - discount / 100;
-        result *= priceDiscountMultiplicator;
-
-        return Task.FromResult(result);
+        return Task.FromResult(contract.EndDate < DateOnly.FromDateTime(DateTime.Now));
     }
-
-    private async Task<bool> IsInvalidProductSelectionAsync(SoftwareLicense license, CompanyClient client)
-    {
-        var licenses = await GetAllProductsForAsync(client);
-        if (licenses.Count == 0) return false;
-
-        if (licenses.Any(c => c.SoftwareLicenseId == license.SoftwareLicenseId)) return true;
-
-        return false;
-    }
-
+    
     private async Task<List<SoftwareLicense>> GetAllProductsForAsync(CompanyClient client)
     {
         return await context.CompanyContracts
@@ -138,46 +161,48 @@ public class CompanyContractService(
 
         return Task.FromResult(daysDiff is < 3 or > 30);
     }
-
-    // TODO: TO BE IMPLEMENTED
-    public async Task TryDissolveIfExpiredAsync(Contract contract)
+    
+    private Task<decimal> CalcTotalPriceAsync(int supportYears, decimal licensePrice, decimal discount)
     {
-        throw new NotImplementedException();
-        // RETURN INSTALLMENTS IF EXIST HERE
+        var totalYearsSupport = 1 + supportYears;
+        var result = licensePrice + totalYearsSupport * UpdatesYearPrice;
+        var priceDiscountMultiplicator = 1 - discount / 100;
+        result *= priceDiscountMultiplicator;
+
+        return Task.FromResult(result);
     }
 
-    public Task<decimal> CalcRemainingPriceToPayAsync(CompanyContract contract)
+    private async Task<bool> IsInvalidProductSelectionAsync(SoftwareLicense license, CompanyClient client)
     {
-        var installments = contract.CorporateInstallments;
-        var remainingPrice = contract.TotalPrice;
+        var licenses = await GetAllProductsForAsync(client);
+        if (licenses.Count == 0) return false;
 
-        foreach (var i in installments)
-        {
-            remainingPrice -= i.Price;
-        }
+        if (licenses.Any(c => c.SoftwareLicenseId == license.SoftwareLicenseId)) return true;
 
-        return Task.FromResult(remainingPrice);
+        return false;
     }
     
-    public async Task<bool> TrySignContractAsync(CompanyContract contract)
+    private async Task CreateAndSaveContractAsync(
+        DateOnly start,
+        DateOnly end,
+        int supportYears,
+        SoftwareLicense license,
+        decimal discount,
+        CompanyClient client
+    )
     {
-        var toBePaid = await CalcRemainingPriceToPayAsync(contract);
-        switch (toBePaid)
+        var contract = new CompanyContract
         {
-            case > 0:
-                return false;
-            case 0:
-                return true;
-            default:
-                var toBeReturned = toBePaid * -1;
-                await ReturnExcessiveMoneyToClientAsync(contract, toBeReturned);
-                return true;
-        }
-    }
+            TotalPrice = await CalcTotalPriceAsync(supportYears, license.StartingUpfrontPrice, discount),
+            StartDate = start,
+            EndDate = end,
+            AdditionalSupportYears = supportYears,
+            Software = license,
+            DiscountPercentage = discount,
+            CompanyClient = client
+        };
 
-    private Task ReturnExcessiveMoneyToClientAsync(CompanyContract contract, decimal toBeReturned)
-    {
-        Console.WriteLine($"Amount: [{toBeReturned}] needs to be returned to client with KRS [{contract.CompanyClient.KrsNum}]");
-        return Task.CompletedTask;
+        await context.CompanyContracts.AddAsync(contract);
+        await context.SaveChangesAsync();
     }
 }
