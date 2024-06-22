@@ -1,0 +1,87 @@
+﻿using s28201_Project.Context;
+using s28201_Project.Dto;
+using s28201_Project.Model;
+
+namespace s28201_Project.Service.Installment;
+
+public class IndividualInstallmentService(ApiContext context, IndividualContractService contractService)
+{
+    public async Task<InstallmentResponse> ProcessInstallmentAsync(IndividualInstallmentDto dto)
+    {
+        var response = new InstallmentResponse();
+
+        if (dto.DistributionType != DistributionType.Upfront)
+        {
+            response.Message = "Is not a contract installment.";
+            return response;
+        }
+
+        var contract = await contractService.GetContractByIdAsync(dto.IndividualId);
+
+        if (contract == null)
+        {
+            response.Message = "Cannot pay for non-existent contract.";
+            return response;
+        }
+
+        if (await IsInvalidPaymentDateAsync(dto.DatePaid, contract.StartDate, contract.EndDate))
+        {
+            response.Message = "Invalid payment date for given contract.";
+            await contractService.TryDissolveIfExpiredAsync(contract);
+            return response;
+        }
+
+        if (dto.Price < 0)
+        {
+            response.Message = "Installment cannot have negative price.";
+            return response;
+        }
+
+        var desc = dto.Desc ?? "";
+        var installment = await CreateInstallmentAsync(contract.ContractId, dto.Price, dto.DatePaid, desc);
+
+        contract.IndividualInstallments.Add(installment);
+        await context.SaveChangesAsync();
+
+        var isSigned = await contractService.TrySignContractAsync(contract);
+
+        var priceDiff = await contractService.CalcRemainingPriceToPayAsync(contract);
+        response.Message = $"Installment was added, but you need to pay {priceDiff} more to sign the contract.";
+
+        if (isSigned)
+        {
+            response.Message = "Contract was signed successfully.";
+        }
+
+        response.IsSuccessful = true;
+        return response;
+    }
+    
+    private async Task<IndividualInstallment> CreateInstallmentAsync(
+        long contractContractId,
+        decimal price,
+        DateOnly datePaid,
+        string desc)
+    {
+        var installment = new IndividualInstallment
+        {
+            IndividualContractId = contractContractId,
+            Price = price,
+            DatePaid = datePaid,
+            DateConfirmed = DateOnly.FromDateTime(DateTime.Now),
+            Desc = desc
+        };
+
+        await context.IndividualInstallments.AddAsync(installment);
+        await context.SaveChangesAsync();
+
+        return installment;
+    }
+
+    private Task<bool> IsInvalidPaymentDateAsync(DateOnly datePaid, DateOnly contractStartDate,
+        DateOnly contractEndDate)
+    {
+        var isBetween = datePaid >= contractStartDate && datePaid <= contractEndDate;
+        return Task.FromResult(isBetween);
+    }
+}
