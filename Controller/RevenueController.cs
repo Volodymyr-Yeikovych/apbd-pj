@@ -1,36 +1,80 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using s28201_Project.Service.Revenue;
 
 namespace s28201_Project.Controller;
 
 [ApiController]
-[Route("api/revenue")]
-public class RevenueController : ControllerBase
+[Route("api/revenue/")]
+public class RevenueController(RevenueService service, ICurrencyService currencyService) : ControllerBase
 {
-    // TODO: Not Implemented
-    [HttpGet("/all")]
-    public IActionResult GetRevenueCompany()
+    
+    [HttpGet("{currencyCode}")]
+    [Authorize(Policy = "UserOrAdmin")]
+    public async Task<IActionResult> GetRevenueCompanyAsync(string currencyCode = "PLN")
     {
-        return Ok();
+        var revenue = await service.GetTotalRevenueAsync();
+
+        var revenueInCurrencyResponse = await currencyService.FromPlnAsync(revenue, currencyCode);
+
+        if (revenueInCurrencyResponse == null)
+        {
+            return BadRequest($"Invalid currency code[{currencyCode}]");
+        }
+
+        return Ok(revenueInCurrencyResponse);
     }
     
-    // TODO: Not Implemented
-    [HttpGet("/all-predicted")]
-    public IActionResult GetPredictedRevenueCompany()
+    [HttpGet("predicted/{currencyCode}")]
+    [Authorize(Policy = "UserOrAdmin")]
+    public async Task<IActionResult> GetPredictedRevenueCompanyAsync(string currencyCode = "PLN")
     {
-        return Ok();
+        var predictedRevenue = await service.GetPredictedRevenueAsync();
+        
+        var revenueInCurrencyResponse = await currencyService.FromPlnAsync(predictedRevenue, currencyCode);
+        
+        if (revenueInCurrencyResponse == null)
+        {
+            return BadRequest($"Invalid currency code[{currencyCode}]");
+        }
+        
+        return Ok(revenueInCurrencyResponse);
     }
     
-    // TODO: Not Implemented
-    [HttpGet("/product/{id:long}")]
-    public IActionResult GetRevenueProduct(long id)
+    [HttpGet("{id:long}/{currencyCode}")]
+    [Authorize(Policy = "UserOrAdmin")]
+    public async Task<IActionResult> GetRevenueProduct(long id, string currencyCode = "PLN")
     {
-        return Ok();
+        var productRevenue = await service.GetProductRevenueAsync(id);
+        
+        if (productRevenue == null) return BadRequest($"Product with id[{id}] does not exists.");
+        
+        var revenueInCurrencyResponse = await currencyService.FromPlnAsync((decimal) productRevenue, currencyCode);
+        
+        if (revenueInCurrencyResponse == null)
+        {
+            return BadRequest($"Invalid currency code[{currencyCode}]");
+        }
+        
+        return Ok(revenueInCurrencyResponse);
     }
     
-    // TODO: Not Implemented
-    [HttpGet("/product-predicted/{id:long}")]
-    public IActionResult GetPredictedRevenueProduct(long id)
+    
+    [HttpGet("predicted/{id:long}/{currencyCode}")]
+    [Authorize(Policy = "UserOrAdmin")]
+    public async Task<IActionResult> GetPredictedRevenueProduct(long id, string currencyCode = "PLN")
     {
-        return Ok();
+        var productPredictedRevenue = await service.GetProductPredictedRevenueAsync(id);
+        
+        if (productPredictedRevenue == null) return BadRequest($"Product with id[{id}] does not exists.");
+        
+        var revenueInCurrencyResponse = await currencyService.FromPlnAsync((decimal) productPredictedRevenue, currencyCode);
+        
+        if (revenueInCurrencyResponse == null)
+        {
+            return BadRequest($"Invalid currency code[{currencyCode}]");
+        }
+        
+        return Ok(revenueInCurrencyResponse);
     }
 }
