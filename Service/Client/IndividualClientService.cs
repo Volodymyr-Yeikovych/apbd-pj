@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using s28201_Project.Context;
 using s28201_Project.Dto;
 using s28201_Project.Model;
@@ -51,5 +52,11 @@ public class IndividualClientService(ApiContext context) : IClientService<Indivi
     public async Task<IndividualClient?> GetClientByPeselAsync(string pesel)
     {
         return await context.IndividualClients.FirstOrDefaultAsync(c => c.Pesel == pesel);
+    }
+
+    public async Task<decimal> GetMaximalDiscountAsync(IndividualClient client)
+    {
+        decimal max = client.Discounts.IsNullOrEmpty() ? 0 : await context.Discounts.Select(d => d.ValuePercent).MaxAsync();
+        return max;
     }
 }
