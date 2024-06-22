@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using s28201_Project.Model;
+using s28201_Project.Model.Employee;
 
 namespace s28201_Project.Context;
 
@@ -13,6 +14,7 @@ public class ApiContext : DbContext
     public DbSet<CompanyInstallment> CorporateInstallments { get; set; }
     public DbSet<IndividualInstallment> IndividualInstallments { get; set; }
     public DbSet<SoftwareLicense> SoftwareLicenses { get; set; }
+    public DbSet<Employee> Employees { get; set; }
 
     protected ApiContext()
     {
@@ -41,7 +43,7 @@ public class ApiContext : DbContext
 
             e.HasMany(c => c.Discounts)
                 .WithMany(d => d.CompanyClients);
-            
+
             e.HasData(new CompanyClient()
                 {
                     ClientId = 1,
@@ -198,6 +200,31 @@ public class ApiContext : DbContext
                     StartingMonthlySubPrice = 50.00m,
                     DistributionType = DistributionType.SubUpfront,
                     LicenseCategory = SoftwareLicenseCategory.Education
+                }
+            );
+        });
+
+        modelBuilder.Entity<Employee>(e =>
+        {
+            e.HasKey(u => u.EmployeeId);
+            e.Property(u => u.Login).IsRequired().HasMaxLength(100);
+            e.Property(u => u.Password).IsRequired().HasMaxLength(100);
+            e.Property(u => u.Role).IsRequired().HasMaxLength(100);
+
+            e.HasData(
+                new Employee
+                {
+                    EmployeeId = 1,
+                    Login = "admin",
+                    Password = "admin",
+                    Role = Role.Admin
+                },
+                new Employee
+                {
+                    EmployeeId = 2,
+                    Login = "user",
+                    Password = "user",
+                    Role = Role.User
                 }
             );
         });
