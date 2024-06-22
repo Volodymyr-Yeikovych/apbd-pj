@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using s28201_Project.Dto;
 using s28201_Project.Service;
 
@@ -9,6 +10,7 @@ namespace s28201_Project.Controller;
 public class CompanyClientController(CompanyClientService service) : ControllerBase
 {
     [HttpGet("{id:long}")]
+    [Authorize(Policy = "UserOrAdmin")]
     public async Task<IActionResult> GetClientAsync(long id)
     {
         var client = await service.GetClientByIdAsync(id);
@@ -19,6 +21,7 @@ public class CompanyClientController(CompanyClientService service) : ControllerB
     }
     
     [HttpPost]
+    [Authorize(Policy = "UserOrAdmin")]
     public async Task<IActionResult> AddClientAsync(CompanyClientDto dto)
     {
         var client = await service.AddClientAsync(dto);
@@ -29,6 +32,7 @@ public class CompanyClientController(CompanyClientService service) : ControllerB
     }
     
     [HttpPut]
+    [Authorize(Policy = "Admin")]
     public async Task<IActionResult> UpdateClientAsync(CompanyClientDto dto)
     {
         var result = await service.UpdateClientAsync(dto);
