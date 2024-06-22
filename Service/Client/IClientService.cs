@@ -10,4 +10,5 @@ public interface IClientService<TClient, TClientDto>
     public Task<bool> AddClientAsync(TClientDto dto);
     public Task<bool> UpdateClientAsync(TClientDto dto);
     public Task<TClient?> GetClientByIdAsync(long id);
+    public Task<decimal> GetMaximalDiscountAsync(TClient client);
 }
